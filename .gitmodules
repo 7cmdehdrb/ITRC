@@ -1,0 +1,7 @@
+[submodule "src/Universal_Robots_ROS_Driver"]
+	path = src/Universal_Robots_ROS_Driver
+	url = https://github.com/UniversalRobots/Universal_Robots_ROS_Driver.git
+[submodule "src/moveit2"]
+	path = src/moveit2
+	url = https://github.com/moveit/moveit2.git
+	branch = humble

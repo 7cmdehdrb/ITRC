@@ -38,6 +38,7 @@ sudo apt remove ros-$ROS_DISTRO-moveit*
     ```
 
 3. **Build the workspace**:
+    - Before build, fix src/moveit2/moveit_configs_utils/setup.py. Make tests_require=["pytest"] disabled
     ```bash
     colcon build --event-handlers desktop_notification- status- --cmake-args -DCMAKE_BUILD_TYPE=Release
     ```
