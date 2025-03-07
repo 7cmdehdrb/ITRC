@@ -1,3 +1,28 @@
+# ITRC Project
+
+![Project Image](https://www.chosun.com/resizer/v2/ZYPY6QMIOX2MLIDAHFVSAK3V4M.jpg?auth=a480083a83d7e5b8fe76e49a1e8a281f507b72ff882ef45ac6cbd58c99166ec0&width=300&height=300&smart=true)
+
+## TODO
+
+### Localization
+- April tag detector & publisher
+- Create AprilTagMsg, AprilTagArrayMsg
+- Create apriltag localization
+
+### Path planning
+- Create path planning node
+- Create path planning algorithm
+- Create mobile base control system
+
+### Pick-And-Place
+- Create Direct-Teaching client node
+- Create manipulator controll system
+
+### State machine
+- Create state machine in order to schedule all tasks
+
+---
+
 # MOVEIT2 Installation Guide
 
 ## Prerequisites
