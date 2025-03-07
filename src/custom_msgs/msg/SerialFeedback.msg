@@ -1,0 +1,3 @@
+float64 interval_time
+int16 motor_left_rpm
+int16 motor_right_rpm
