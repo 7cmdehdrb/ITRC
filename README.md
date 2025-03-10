@@ -24,6 +24,9 @@
 ---
 
 # Ros_bridge_server
+```bash
+sudo apt-get install ros-humble-rosbridge-server
+```
 
 ---
 
