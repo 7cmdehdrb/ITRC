@@ -36,9 +36,15 @@ Streaming using web_video_server
 ```bash
 ros2 run web_video_server web_video_server
 ```
+
 Building a website
 ```bash
 python3 -m http.server
+```
+
+Access web site
+```bash
+http://ip:8000/web_interaction/index_ITRC.html
 ```
 
 ---
