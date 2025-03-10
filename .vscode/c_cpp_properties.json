@@ -1,0 +1,41 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/irol/workspace/project_sky/install/custom_msgs/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_planners/chomp/chomp_interface/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_planners/chomp/chomp_motion_planner/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_planners/pilz_industrial_motion_planner/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_planners/pilz_industrial_motion_planner_testutils/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_planners/test_configs/prbt_ikfast_manipulator_plugin/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_plugins/moveit_ros_control_interface/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_plugins/moveit_simple_controller_manager/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_ros/benchmarks/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_ros/move_group/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_ros/moveit_servo/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_ros/occupancy_map_monitor/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_ros/robot_interaction/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_ros/warehouse/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_setup_assistant/moveit_setup_app_plugins/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_setup_assistant/moveit_setup_assistant/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_setup_assistant/moveit_setup_controllers/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_setup_assistant/moveit_setup_core_plugins/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_setup_assistant/moveit_setup_framework/include/**",
+        "/home/irol/workspace/ITRC/src/moveit2/moveit_setup_assistant/moveit_setup_srdf_plugins/include/**",
+        "/home/irol/workspace/ITRC/src/web_video_server/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

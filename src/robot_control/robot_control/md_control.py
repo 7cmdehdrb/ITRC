@@ -28,16 +28,16 @@ from enum import Enum
 from custom_msgs.msg import SerialFeedback
 
 
-class MDRobotNode(Node):    
-    class MDProtocol(object):    
-        class PacketType(Enum):        
+class MDRobotNode(Node):
+    class MDProtocol(object):
+        class PacketType(Enum):
             RMID = 183
             TMID = 184
             ID = 1
-            
+
         def __init__(self):
             pass
-        
+
         @staticmethod
         def from_byte(data: bytearray):
             state_param = data[2]
@@ -55,94 +55,102 @@ class MDRobotNode(Node):
                 "sync_mode_comm_fail": sync_mode_comm_fail,
                 "overload_alarm": overload_alarm,
                 "undervoltage_alarm": undervoltage_alarm,
-        }
-        
-        
+            }
+
         @staticmethod
         def from_bytes(data: bytearray):
             """
             d0, d1 : wheel 1 RPM
             d2 : wheel 1 state param
             d3, d4, d5 d6 : wheel 1 encoder
-            
+
             d7, d8 : wheel 2 RPM
             d9 : wheel 2 state param
             d10, d11, d12, d13 : wheel 2 encoder
-            
+
             State Parameter (1byte)
-            
+
             BIT0: START/STOP 신호 반전 여부 (1: HIGH → ON, 0: LOW → ON)
             BIT1: RUN/BRAKE 신호 반전 여부
             BIT2: 동기제어(SYNC) 모드에서 슬레이브 제어기 상태 (1: FAIL)
             BIT3: 동기제어에서 슬레이브 제어기와의 통신 실패 여부 (1: FAIL)
             BIT4: 과부하 알람 발생 여부 (FAULT 발생)
             BIT5: 저전압 알람 발생 여부 (저전압 감지됨)
-            """       
+            """
+
+            # print(data[-1])
+            # return SerialFeedback()
             wheel1_rpm = int.from_bytes(data[0:2], byteorder="little", signed=True)
             wheel1_encoder = int.from_bytes(data[3:7], byteorder="little", signed=True)
-            wheel1_state = MDRobotNode.MDProtocol.from_byte(data[2])
-            
+            # wheel1_state = MDRobotNode.MDProtocol.from_byte(data[2])
+
             wheel2_rpm = int.from_bytes(data[7:9], byteorder="little", signed=True)
-            wheel2_encoder = int.from_bytes(data[10:14], byteorder="little", signed=True)
-            wheel2_state = MDRobotNode.MDProtocol.from_byte(data[9])
-            
-            msg = SerialFeedback(
-                motor_left_rpm=wheel1_rpm,
-                moter_left_position=wheel1_encoder,
-                motor_right_rpm=wheel2_rpm,
-                moter_right_position=wheel2_encoder,
+            wheel2_encoder = int.from_bytes(
+                data[10:14], byteorder="little", signed=True
             )
-            
+            # wheel2_state = MDRobotNode.MDProtocol.from_byte(data[9])
+
+            wheel1_rpm = np.clip(wheel1_rpm, 0, 10)
+            wheel2_rpm = np.clip(wheel2_rpm, 0, 10)
+
+            msg = SerialFeedback(
+                motor_left_rpm=int(wheel1_rpm),
+                moter_left_position=int(wheel1_encoder),
+                motor_right_rpm=int(wheel2_rpm),
+                moter_right_position=int(wheel2_encoder),
+            )
+
             return msg
-        
+
         def create_checksum(self, packet: bytearray):
             byChkSend = sum(packet[:-1]) & 0xFF
             return (~byChkSend + 1) & 0xFF
-        
+
         def create_control_packet(self, left_rpm: int, right_rpm: int):
             data_num = 7
-            data_length = 7 + data_num # HEADER + data_num
-            
+            data_length = 7 + data_num  # HEADER + data_num
+
             packet = bytearray(data_length)
-            
-            packet[0] = MDRobotNode.MDProtocol.PacketType.RMID
-            packet[1] = MDRobotNode.MDProtocol.PacketType.TMID
-            packet[2] = MDRobotNode.MDProtocol.PacketType.ID
-            packet[3] = 207 # PID_PNT_VEL_CMD
+
+            packet[0] = 183
+            packet[1] = 184
+            packet[2] = 1
+            packet[3] = 207  # PID_PNT_VEL_CMD
             packet[4] = data_num
-            
+
             data_packet = bytearray(data_num)
-            
-            # wheel 1
+
             data_packet[0] = 1
             data_packet[1:3] = left_rpm.to_bytes(2, byteorder="little", signed=True)
-            
+
             # wheel 2
             data_packet[3] = 1
             data_packet[4:6] = right_rpm.to_bytes(2, byteorder="little", signed=True)
-            
+
             # return data
-            data_packet[6] = 1 # PID_PNT_MONITOR
-            
-            packet[5:5+data_num] = data_packet
-             
-            packet[-1] = self.create_checksum(packet)
-            
+            data_packet[6] = 1  # PID_PNT_MONITOR
+
+            packet[5 : 5 + data_num] = data_packet
+
+            packet[12] = self.create_checksum(packet)
+
             return packet
-        
+
         def parse_feedback_packet(self, packet: bytearray):
+            print(len(packet))
             # rmid = packet[0] # 183
             # tmid = packet[1]
             # id = packet[2]
             # pid = packet[3] # 216
-            data_num = packet[4] # 16
+            data_num = packet[4]  # 14
             # checksum = packet[-1]
-            
-            data_packet = packet[5:5+int(data_num)]
+
+            data_packet = packet[5:-1]
+            print(len(data_packet))
             serial_feedback = MDRobotNode.MDProtocol.from_bytes(data_packet)
-        
+
             return serial_feedback
-        
+
     def __init__(self):
         super().__init__("md_robot_node")
 
@@ -155,9 +163,9 @@ class MDRobotNode(Node):
 
         # >>> Parameters >>>
         self.serial_port = self.serial_data["serial_port"]
-        self.baudrate = self.serial_data["serial_baudrate"]
+        self.baudrate = self.serial_data["baud_rate"]
 
-        model_description = self.serial_data["model"]
+        model_description = self.serial_data["model_description"]
 
         self.wheel_radius = model_description["wheel_radius"]
         self.wheel_length = model_description["wheel_radius"]
@@ -172,15 +180,17 @@ class MDRobotNode(Node):
         # ROS2 구독 및 발행 설정
         self.cmd_vel_sub = self.create_subscription(
             Twist,
-            self.get_name + "/cmd_vel",
+            self.get_name() + "/cmd_vel",
             self.cmd_vel_callback,
             qos_profile=qos_profile_system_default,
         )
         self.feedback_pub = self.create_publisher(
             SerialFeedback,
-            self.get_name + "/serial_feedback",
+            self.get_name() + "/serial_feedback",
             qos_profile=qos_profile_system_default,
         )
+
+        self.response_data = bytearray()
 
         # 데이터 송수신 루프
         self.last_time = self.get_clock().now()
@@ -218,6 +228,8 @@ class MDRobotNode(Node):
         """
         send_data = self.protocol.create_control_packet(rpm_left, rpm_right)
 
+        # self.get_logger().info("Send motor command: {}".format(send_data))
+
         # 시리얼 포트로 데이터 전송
         self.serial_conn.write(send_data)
 
@@ -226,10 +238,13 @@ class MDRobotNode(Node):
         Read serial data with self.hz frequency.
         """
         if self.serial_conn.in_waiting:
-            data = self.serial_conn.read(7 + 14)  # 최대 32바이트 읽기
-            
+            data = self.serial_conn.read(20)  # 최대 32바이트 읽기
+
+            print(data)
+
             try:
                 serial_feedback = self.protocol.parse_feedback_packet(data)
+                print(serial_feedback)
                 self.feedback_pub.publish(serial_feedback)
             except Exception as ex:
                 self.get_logger().error("Error parsing serial data: {}".format(ex))

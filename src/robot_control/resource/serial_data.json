@@ -1,9 +1,9 @@
 {
     "serial_port": "/dev/ttyUSB0",
-    "baud_rate": 57600,
+    "baud_rate": 19200,
     "model_description": {
-        "wheel_radius": 0.0935, 
-        "wheel_length": 0.454, 
+        "wheel_radius": 0.122, 
+        "wheel_length": 0.64, 
         "reduction": 30, 
         "maxrpm": 1000
     }
