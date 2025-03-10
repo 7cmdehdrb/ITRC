@@ -1,0 +1,1 @@
+stubgen -m <package_name> -o ~/.local/lib/python3.10/site-packages/
