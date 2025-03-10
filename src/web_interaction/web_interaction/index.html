@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ROS2 Image Stream with Touch</title>
+    <script src="roslib.js"></script>
+    <style>
+        /* Your CSS stays the same */
+        body, html {
+            margin: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: black;
+        }
+        .center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+        img {
+            object-fit: contain;
+            width: 60vw;
+            height: 60vh;
+            position: absolute;
+            top: 50%;
+            left: 40%;
+            transform: translate(-50%, -50%);
+        }
+        #popup {
+            object-fit: cover;
+            top: 50%;
+            left: 85%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width: 35vh;
+            height: 60vh;
+            background-color: white;
+            color: black;
+            text-align: center;
+        }
+        #popupTitle {
+            font-size: 24px; /* Adjust size as per requirement */
+            color: #000; /* Adjust color as per requirement */
+            margin: 10; /* Optional: Remove margin to reduce space around text */
+            padding: 0; /* Optional: Remove padding to reduce space around text */
+        }
+        #popupMessage {
+            font-size: 20px; /* Adjust size as per requirement */
+            color: #000; /* Adjust color as per requirement */
+        }
+
+
+        .arrow-btn {
+            width: 80px;
+            height: 80px;
+            background-color: purple;
+            color: white;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            flex: 1;
+        }
+        /* Styles for control buttons container */
+        .control-buttons {
+            position: absolute;
+            top: 65vh;  /* Adjust this value to position control buttons above arrow buttons */
+            left: 85%;
+            transform: translate(-50%, -100%); /* This ensures the buttons are centered and above */
+            display: flex;
+            gap: 20px; /* Gap between the buttons */
+            flex-direction: row; /* Align buttons in a column */
+        }
+
+        .control-btn {
+            width: 180px; /* Match the width of your arrow buttons or as desired */
+            height: 50px; /* Adjust height as needed */
+            background-color: blue; /* Or any color you prefer */
+            color: white;
+            border: none;
+            font-size: 20px; /* Adjust font size as needed */
+            cursor: pointer;
+            margin-bottom: 20px; /* Space between control buttons and arrow buttons */
+        }
+
+        /* Adjust .arrow-buttons position if needed, based on new layout */
+        .arrow-buttons {
+            position: absolute;
+            top: calc(60vh + 80px); /* Adjust this value based on the height and margin of the control buttons */
+            left: 85%;
+            transform: translate(-50%, 0);
+            display: flex;
+            gap: 20px; /* Gap between the buttons */
+        }
+
+    </style>
+</head>
+<body>
+    <!-- <div id="info">
+        <p id="popup">Message</p>
+    </div> -->
+    <div class="container">
+        <div id="popup">
+            <h1 id="popupTitle">Target object</h1>
+            <p id="popupMessage"></p>
+        </div>
+        <img id="rosImage" 
+             src="http://192.168.0.31:8080/stream?topic=/processed_image"
+             alt="ROS Stream" 
+             onclick="sendRosMessage(event)">
+        <!-- Control buttons container -->
+        <div class="control-buttons">
+            <button class="control-btn" id="reset">Reset</button>
+            <button class="control-btn" id="finish">Finish</button>
+        </div>
+
+        <!-- Arrow buttons container -->
+        <div class="arrow-buttons">
+            <button class="arrow-btn" id="up">↑</button>
+            <button class="arrow-btn" id="left">←</button>
+            <button class="arrow-btn" id="right">→</button>
+            <button class="arrow-btn" id="down">↓</button>
+        </div>
+
+    </div>
+
+    <script type="text/javascript">
+        var ros = new ROSLIB.Ros({
+            url: 'ws://192.168.0.31:9090'
+        });
+
+        ros.on('connection', function() {
+            console.log('Connected to websocket server.');
+        });
+
+        ros.on('error', function(error) {
+            console.log('Error connecting to websocket server: ', error);
+        });
+
+        ros.on('close', function() {
+            console.log('Connection to websocket server closed.');
+        });
+
+        var BoxInfoTopic = new ROSLIB.Topic({
+            ros: ros,
+            name: '/box_info',
+            messageType: 'std_msgs/msg/String' // Note the change in message type
+        });
+
+        var touchTopic = new ROSLIB.Topic({
+            ros: ros,
+            name: '/touch_event',
+            messageType: 'geometry_msgs/msg/Point' // Note the change in message type
+        });
+
+        var dragTopic = new ROSLIB.Topic({
+            ros: ros,
+            name: '/drag_coordinates',
+            messageType: 'std_msgs/Float32MultiArray'
+        });
+
+        var isButtonPressed = false;
+        var directionTopic = new ROSLIB.Topic({
+            ros: ros,
+            name: '/direction',
+            messageType: 'std_msgs/msg/String'
+        });
+
+
+        var selectTopic = new ROSLIB.Topic({
+            ros: ros,
+            name: '/select_signal',
+            messageType: 'std_msgs/msg/String'
+        });
+
+
+        function sendDirection(direction) {
+            if(isButtonPressed) {
+                var msg = new ROSLIB.Message({
+                    data: direction
+                });
+                directionTopic.publish(msg);
+                console.log('Sent message:', direction);
+
+                // Continue sending as long as the button is pressed
+                setTimeout(function() {
+                    sendDirection(direction);
+                }, 100);  // Send every 100ms, adjust as needed
+            }
+        }
+
+        document.getElementById('reset').addEventListener('click', sendResetMessage);
+        document.getElementById('finish').addEventListener('click', sendFinishMessage);
+
+        document.getElementById('up').addEventListener('touchstart', function() {
+            isButtonPressed = true;
+            sendDirection('up');
+        });
+
+        document.getElementById('up').addEventListener('touchend', function() {
+            isButtonPressed = false;
+        });
+
+        document.getElementById('left').addEventListener('touchstart', function() {
+            isButtonPressed = true;
+            sendDirection('left');
+        });
+
+        document.getElementById('left').addEventListener('touchend', function() {
+            isButtonPressed = false;
+        });
+
+        document.getElementById('right').addEventListener('touchstart', function() {
+            isButtonPressed = true;
+            sendDirection('right');
+        });
+
+        document.getElementById('right').addEventListener('touchend', function() {
+            isButtonPressed = false;
+        });
+
+        document.getElementById('down').addEventListener('touchstart', function() {
+            isButtonPressed = true;
+            sendDirection('down');
+        });
+
+        document.getElementById('down').addEventListener('touchend', function() {
+            isButtonPressed = false;
+        });
+
+        function sendResetMessage() {
+            var popupMessage = document.getElementById('popupMessage');
+            popupMessage.innerHTML = ""; // Clear the popup message content
+            
+            var resetMessage = new ROSLIB.Message({
+                data: 'reset'
+            });
+            selectTopic.publish(resetMessage);
+            console.log('Sent reset message to /reset_signal');
+        }
+
+        function sendFinishMessage() {
+            var popupMessage = document.getElementById('popupMessage');
+            popupMessage.innerHTML = ""; // Clear the popup message content
+            var finishMessage = new ROSLIB.Message({
+                data: 'finish'
+            });
+            selectTopic.publish(finishMessage);
+            console.log('Sent finish message to /finish_signal');
+            // Display "Manipulator control" message
+            popupMessage.innerHTML = "";
+
+            // Set a timeout to clear the message after 3 seconds
+            setTimeout(function() {
+                popupMessage.innerHTML = "";
+            }, 3000); // 3000 milliseconds = 3 seconds
+        }
+        
+
+        document.getElementById("rosImage").addEventListener("mousedown", mouseDownFunction);
+        document.getElementById("rosImage").addEventListener("mouseup", mouseUpFunction);
+        document.getElementById("rosImage").addEventListener("touchstart", mouseDownFunction);
+        document.getElementById("rosImage").addEventListener("touchend", mouseUpFunction);
+
+        var startPos = {x: 0, y: 0};
+        var endPos = {x: 0, y: 0};
+
+        function mouseDownFunction(e){
+            startPos.x = e.pageX || e.touches[0].pageX;
+            startPos.y = e.pageY || e.touches[0].pageY;
+        }
+
+        function mouseUpFunction(e){
+            endPos.x = e.pageX || e.changedTouches[0].pageX;
+            endPos.y = e.pageY || e.changedTouches[0].pageY;
+
+            sendDragCoordinates(startPos.x, startPos.y, endPos.x, endPos.y);
+        }
+
+        function sendDragCoordinates(startX, startY, endX, endY) {
+            // Float32MultiArray 메시지 생성
+            if ((Math.abs(startX - endX) > 10) || (Math.abs(startY - endY) > 10)){
+                var msg = new ROSLIB.Message({
+                    data: [startX, startY, endX, endY]  // 시작점과 끝점 좌표를 배열로 전송
+                });
+
+                // 메시지를 /drag_coordinates 토픽으로 발행
+                dragTopic.publish(msg);
+                console.log("Sent drag coordinates to /drag_coordinates:", startX, startY, endX, endY);
+            }
+        }
+
+
+
+        BoxInfoTopic.subscribe(function(message) {
+            console.log('Received message on ' + BoxInfoTopic.name + ': ' + message.data);
+            updatePopup(message.data);
+        });
+
+        function updatePopup(message) {
+            var popupMessage = document.getElementById('popupMessage');
+            // Add the new message on a new line below the existing messages
+            popupMessage.innerHTML += message + '<br>';
+        }
+
+
+        function sendRosMessage(event) {
+            var imgElement = document.getElementById('rosImage');
+            var boundingRect = imgElement.getBoundingClientRect();
+            
+            var x = event.clientX - boundingRect.left;
+            var y = event.clientY - boundingRect.top;
+
+            var displayedWidth = boundingRect.width;
+            var displayedHeight = boundingRect.height;
+            var originalWidth = imgElement.naturalWidth;
+            var originalHeight = imgElement.naturalHeight;
+
+            var scaleX = originalWidth / displayedWidth;
+            var scaleY = originalHeight / displayedHeight;
+
+            var pixelX = x * scaleX;  // Corrected variable name here
+            var pixelY = y * scaleY;
+
+            // Check if click is inside the actual image area
+            if (pixelX >= 0 && pixelX <= originalWidth && pixelY >= 0 && pixelY <= originalHeight) {
+                console.log('Clicked position:', pixelX, pixelY);
+
+                var message = new ROSLIB.Message({
+                    x: pixelX,
+                    y: pixelY,
+                    z: 0
+                });
+                touchTopic.publish(message);
+                console.log('Sent message to /touch_event');
+            } else {
+                console.log('Click outside of the image data area.');
+            }
+        }
+    </script>
+</body>
+</html>
