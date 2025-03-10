@@ -24,8 +24,21 @@
 ---
 
 # Ros_bridge_server
+Connect web page and ROS server
 ```bash
 sudo apt-get install ros-humble-rosbridge-server
+```
+```bash
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+```
+
+Streaming using web_video_server
+```bash
+ros2 run web_video_server web_video_server
+```
+Building a website
+```bash
+python3 -m http.server
 ```
 
 ---
