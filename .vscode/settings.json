@@ -1,20 +1,17 @@
 {
     "python.autoComplete.extraPaths": [
-        "/home/min/.local/lib/python3.10/site-packages",
         "/opt/ros/humble/lib/python3.10/site-packages",
         "/opt/ros/humble/local/lib/python3.10/dist-packages",
-        "./install/base_package/lib/python3.10/site-packages",
-        "./install/custom_msgs/lib/python3.10/site-packages",
-        "/home/min/.local/lib/python3.10/site-packages/rtde_control.cpython-310-x86_64-linux-gnu.so"
+        "./install/custom_msgs/local/lib/python3.10/dist-packages"
     ],
     "python.analysis.extraPaths": [
-        "/home/min/.local/lib/python3.10/site-packages",
         "/opt/ros/humble/lib/python3.10/site-packages",
         "/opt/ros/humble/local/lib/python3.10/dist-packages",
-        "./install/base_package/lib/python3.10/site-packages",
-        "./install/custom_msgs/lib/python3.10/site-packages",
-        "/home/min/.local/lib/python3.10/site-packages/rtde_control.cpython-310-x86_64-linux-gnu.so"
+        "./install/custom_msgs/local/lib/python3.10/dist-packages"
     ],
+    // "python.languageServer": "Pylance",
     "python.analysis.useLibraryCodeForTypes": true,
-    "cmake.ignoreCMakeListsMissing": true
+    // "cmake.ignoreCMakeListsMissing": true
+    // "cmake.ignoreCMakeListsMissing": true,
+
 }
