@@ -1,75 +1,88 @@
-# ROS2
-import rclpy
-from rclpy.node import Node
-from rclpy.time import Time
-from rclpy.duration import Duration
-from rclpy.qos import QoSProfile, qos_profile_system_default
-
-# Message
-from std_msgs.msg import *
-from geometry_msgs.msg import *
-from sensor_msgs.msg import *
-from nav_msgs.msg import *
-from visualization_msgs.msg import *
-from custom_msgs.msg import AprilTagMessage, AprilTagArrayMessage
-
-
-# TF
-from tf2_ros import *
-
-# Python
 import numpy as np
+import matplotlib.pyplot as plt
 
 
-class TestNode(Node):
-    def __init__(self):
-        super().__init__("test_node")
+class PurePursuit:
+    def __init__(self, path, lookahead_distance, wheel_base):
+        self.path = np.array(path)  # 경로 좌표 리스트 (x, y)
+        self.lookahead_distance = lookahead_distance  # 추적할 거리
+        self.wheel_base = wheel_base  # 차동구동 로봇의 바퀴 간 거리
 
-        self.timer = self.create_timer(0.1, self.run)
+    def find_lookahead_point(self, position):
+        """현재 위치에서 가장 가까운 Lookahead Point를 찾는 함수"""
+        for i in range(len(self.path) - 1):
+            start, end = self.path[i], self.path[i + 1]
+            # start ~ end를 선분으로 보고, Lookahead Distance를 만족하는 점 찾기
+            vec = end - start
+            length = np.linalg.norm(vec)
+            if length == 0:
+                continue
+            unit_vec = vec / length
+            proj = np.dot(position - start, unit_vec)
+            closest_point = start + unit_vec * np.clip(proj, 0, length)
+            if np.linalg.norm(closest_point - position) > self.lookahead_distance:
+                return end  # Lookahead Distance를 만족하는 점 선택
+        return self.path[-1]  # 마지막 점 반환 (종료 시)
 
-        self.test_pub1 = self.create_publisher(
-            AprilTagMessage, self.get_name() + "/tag", qos_profile_system_default
-        )
-        self.test_pub2 = self.create_publisher(
-            AprilTagArrayMessage, self.get_name() + "/tags", qos_profile_system_default
-        )
+    def compute_steering(self, position, theta):
+        """현재 위치에서 Lookahead Point를 따라가기 위한 회전율 계산"""
+        lookahead_point = self.find_lookahead_point(position)
+        dx, dy = lookahead_point - position
+        angle_to_target = np.arctan2(dy, dx)
+        alpha = angle_to_target - theta  # 방향 오차
+        curvature = 2 * np.sin(alpha) / self.lookahead_distance
+        return curvature
 
-    def run(self):
-        tag_msg = AprilTagMessage()
-        tag_msg.id = 0
-        tag_msg.pose.header = Header(
-            stamp=self.get_clock().now().to_msg(), frame_id="camera1_link"
-        )
-        tag_msg.pose.pose.pose.position = Point(x=1.0, y=2.0, z=3.0)
-        tag_msg.pose.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
-
-        self.test_pub1.publish(tag_msg)
-
-        # msg = AprilTagArrayMessage()
-        # for i in range(1, 5):
-        #     i = float(i)
-        #     tag = AprilTagMessage()
-        #     tag.id = int(i)
-        #     tag.header = Header(
-        #         stamp=self.get_clock().now().to_msg(), frame_id="camera1_link"
-        #     )
-        #     tag.pose.pose.position = Point(x=i, y=i, z=i)
-        #     tag.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
-        #     msg.tags.append(tag)
-
-        # self.test_pub2.publish(msg)
-
-
-def main():
-    rclpy.init(args=None)
-
-    node = TestNode()
-
-    rclpy.spin(node)
-
-    node.destroy_node()
-    rclpy.shutdown()
+    def compute_wheel_speeds(self, v, curvature):
+        """주어진 속도 v에서 차동 구동 로봇의 바퀴 속도 계산"""
+        omega = v * curvature  # 각속도
+        v_r = v + (self.wheel_base / 2) * omega  # 오른쪽 바퀴 속도
+        v_l = v - (self.wheel_base / 2) * omega  # 왼쪽 바퀴 속도
+        return v_l, v_r
 
 
-if __name__ == "__main__":
-    main()
+def simulate():
+    # 샘플 경로 설정 (waypoints)
+    path = np.array([[0, 0], [2, 1], [4, 2], [6, 0], [8, -1], [10, 0]])
+    lookahead_distance = 1.0
+    wheel_base = 0.5  # 바퀴 간 거리
+
+    controller = PurePursuit(path, lookahead_distance, wheel_base)
+
+    # 초기 상태 설정
+    position = np.array([0, -0.5])
+    theta = 0  # 초기 방향
+    v = 1.0  # 선속도 (m/s)
+    dt = 0.1  # 시간 간격
+
+    positions = [position]
+
+    for _ in range(100):  # 시뮬레이션 반복
+        curvature = controller.compute_steering(position, theta)
+        v_l, v_r = controller.compute_wheel_speeds(v, curvature)
+
+        # 차동 구동 모델의 이동 업데이트
+        omega = (v_r - v_l) / wheel_base  # 각속도
+        theta += omega * dt  # 방향 업데이트
+        position += np.array([v * np.cos(theta), v * np.sin(theta)]) * dt
+        positions.append(position.copy())
+
+        if np.linalg.norm(position - path[-1]) < 0.5:  # 목표 도착 여부 확인
+            break
+
+    positions = np.array(positions)
+
+    # 결과 시각화
+    plt.plot(path[:, 0], path[:, 1], "ro-", label="Path")  # 목표 경로
+    plt.plot(
+        positions[:, 0], positions[:, 1], "b-", label="Tracked Path"
+    )  # 로봇 이동 경로
+    plt.legend()
+    plt.xlabel("X")
+    plt.ylabel("Y")
+    plt.title("Pure Pursuit Path Tracking")
+    plt.grid()
+    plt.show()
+
+
+simulate()

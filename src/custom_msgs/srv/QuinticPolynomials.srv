@@ -1,0 +1,12 @@
+geometry_msgs/Point start_position
+geometry_msgs/Quaternion start_orientation
+float64 start_velocity
+float64 start_acceleration
+geometry_msgs/Point end_position
+geometry_msgs/Quaternion end_orientation
+float64 end_velocity
+float64 end_acceleration
+---
+# Response
+bool is_success
+nav_msgs/Path path
