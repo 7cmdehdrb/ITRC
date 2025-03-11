@@ -104,6 +104,7 @@ class WheelOdometryNode(Node):
 
         self.wheel_radius = self.serial_data["model_description"]["wheel_radius"]
         self.wheel_length = self.serial_data["model_description"]["wheel_length"]
+        self.reduction = self.serial_data["model_description"]["reduction"]
 
         self.odometry = WheelOdometryNode.WheelOdometry()
 
@@ -132,12 +133,15 @@ class WheelOdometryNode(Node):
         """
         Calculate linear and angular velocity from motor feedback
         """
-        dt = msg.interval_time
+        dt = msg.interval_time # seconds
         left_rpm = msg.motor_left_rpm
         right_rpm = msg.motor_right_rpm
+        
+        left_omega = (left_rpm / 60.0) * 2 * np.pi
+        right_omega = (right_rpm / 60.0) * 2 * np.pi
 
-        left_velocity = (left_rpm / 60.0) * 2 * np.pi * self.wheel_radius
-        right_velocity = (right_rpm / 60.0) * 2 * np.pi * self.wheel_radius
+        left_velocity = left_omega * self.wheel_radius
+        right_velocity = right_omega * self.wheel_radius
 
         linear_velocity = (left_velocity + right_velocity) / 2.0
         angular_velocity = (right_velocity - left_velocity) / self.wheel_length

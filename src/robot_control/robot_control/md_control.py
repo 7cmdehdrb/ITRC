@@ -11,6 +11,7 @@ from geometry_msgs.msg import *
 from sensor_msgs.msg import *
 from nav_msgs.msg import *
 from visualization_msgs.msg import *
+from custom_msgs.msg import SerialFeedback
 
 # TF
 from tf2_ros import *
@@ -25,8 +26,7 @@ import time
 from enum import Enum
 
 # Custom
-from custom_msgs.msg import SerialFeedback
-
+from ament_index_python.packages import get_package_share_directory
 
 class MDRobotNode(Node):
     class MDProtocol(object):
@@ -34,6 +34,7 @@ class MDRobotNode(Node):
             RMID = 183
             TMID = 184
             ID = 1
+            PID = 207 # PID_PNT_VEL_CMD
 
         def __init__(self):
             pass
@@ -108,16 +109,9 @@ class MDRobotNode(Node):
 
         def create_control_packet(self, left_rpm: int, right_rpm: int):
             data_num = 7
-            data_length = 7 + data_num  # HEADER + data_num
+            data_length = 6 + data_num  # HEADER + data_num
 
-            packet = bytearray(data_length)
-
-            packet[0] = 183
-            packet[1] = 184
-            packet[2] = 1
-            packet[3] = 207  # PID_PNT_VEL_CMD
-            packet[4] = data_num
-
+            # >>> DATA >>>
             data_packet = bytearray(data_num)
 
             data_packet[0] = 1
@@ -129,24 +123,29 @@ class MDRobotNode(Node):
 
             # return data
             data_packet[6] = 1  # PID_PNT_MONITOR
+            # <<< DATA <<<
+            
+            packet = bytearray(data_length)
 
+            packet[0] = MDRobotNode.MDProtocol.PacketType.RMID.value
+            packet[1] = MDRobotNode.MDProtocol.PacketType.TMID.value
+            packet[2] = MDRobotNode.MDProtocol.PacketType.ID.value
+            packet[3] = MDRobotNode.MDProtocol.PacketType.PID.value  # PID_PNT_VEL_CMD
+            packet[4] = data_num
             packet[5 : 5 + data_num] = data_packet
-
             packet[12] = self.create_checksum(packet)
 
             return packet
 
         def parse_feedback_packet(self, packet: bytearray):
-            print(len(packet))
             # rmid = packet[0] # 183
             # tmid = packet[1]
             # id = packet[2]
             # pid = packet[3] # 216
-            data_num = packet[4]  # 14
+            # data_num = packet[4]  # 14
             # checksum = packet[-1]
 
             data_packet = packet[5:-1]
-            print(len(data_packet))
             serial_feedback = MDRobotNode.MDProtocol.from_bytes(data_packet)
 
             return serial_feedback
@@ -154,12 +153,27 @@ class MDRobotNode(Node):
     def __init__(self):
         super().__init__("md_robot_node")
 
-        resource_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "resource"
-        )
-        # 시리얼 포트 설정
-        with open(os.path.join(resource_path, "serial_data.json"), "r") as f:
-            self.serial_data = json.load(f)
+        try:
+            package_name = "robot_control"
+            package_path = get_package_share_directory(package_name)
+            resource_path = os.path.join(
+                package_path, os.pardir, "ament_index", "resource_index", "packages"
+            )
+
+            with open(os.path.join(resource_path, "serial_data.json"), "r") as f:
+                self.serial_data = json.load(f)
+                
+                
+        except Exception as ex:
+            self.get_logger().error(f"Failed to get package path: {ex}")
+            
+        # resource_path = os.path.join(
+        #     os.path.dirname(os.path.dirname(__file__)), "resource"
+        # )
+        # # 시리얼 포트 설정
+        # with open(os.path.join(resource_path, "serial_data.json"), "r") as f:
+        #     self.serial_data = json.load(f)
+
 
         # >>> Parameters >>>
         self.serial_port = self.serial_data["serial_port"]
@@ -194,7 +208,7 @@ class MDRobotNode(Node):
 
         # 데이터 송수신 루프
         self.last_time = self.get_clock().now()
-        self.hz = 10
+        self.hz = 30
         self.timer = self.create_timer(float(1.0 / self.hz), self.read_serial_data)
 
     def cmd_vel_callback(self, msg: Twist):
@@ -214,13 +228,21 @@ class MDRobotNode(Node):
         Input linear and angular speed and compute rpm for left and right wheels.
         Solve differential drive kinematics.
         """
-        left_speed = linear - (angular * self.wheel_length / 2)
+        
+        # 각 바퀴의 선속도 계산
         right_speed = linear + (angular * self.wheel_length / 2)
+        left_speed = linear - (angular * self.wheel_length / 2)
+        
+        right_omega = right_speed / self.wheel_radius
+        left_omega = left_speed / self.wheel_radius
 
-        rpm_left = int(left_speed * 9.5492743 / self.wheel_radius * self.reduction)
-        rpm_right = int(right_speed * 9.5492743 / self.wheel_radius * self.reduction)
+        right_rpm = right_omega * 60 / (2 * np.pi)
+        left_rpm = left_omega * 60 / (2 * np.pi)
 
-        return rpm_left, rpm_right
+        # rpm_right = int(right_speed * 9.5492743 / self.wheel_radius * self.reduction)
+        # rpm_left = int(left_speed * 9.5492743 / self.wheel_radius * self.reduction)
+
+        return left_rpm, right_rpm
 
     def send_motor_command(self, rpm_left, rpm_right):
         """
@@ -238,13 +260,17 @@ class MDRobotNode(Node):
         Read serial data with self.hz frequency.
         """
         if self.serial_conn.in_waiting:
-            data = self.serial_conn.read(20)  # 최대 32바이트 읽기
-
-            print(data)
+            data = self.serial_conn.read(20)  # 20 bytes
 
             try:
                 serial_feedback = self.protocol.parse_feedback_packet(data)
-                print(serial_feedback)
+                
+                # Calculate interval time
+                current_time = self.get_clock().now()
+                delta_time = current_time - self.last_time
+                serial_feedback.interval_time = delta_time.nanoseconds / 1e9
+                self.last_time = current_time
+                
                 self.feedback_pub.publish(serial_feedback)
             except Exception as ex:
                 self.get_logger().error("Error parsing serial data: {}".format(ex))

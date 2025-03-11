@@ -1,0 +1,3 @@
+std_msgs/Header header
+geometry_msgs/PoseWithCovariance pose
+uint16 id
