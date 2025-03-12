@@ -15,6 +15,7 @@
     ],
     // "python.languageServer": "Pylance",
     "python.analysis.useLibraryCodeForTypes": true,
+    "cmake.ignoreCMakeListsMissing": true,
     // "cmake.ignoreCMakeListsMissing": true
     // "cmake.ignoreCMakeListsMissing": true,
 

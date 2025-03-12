@@ -71,37 +71,38 @@ class QPPlannerClient(object):
             self.node.get_name() + "/quintic_polynomials_path",
             qos_profile=qos_profile_system_default,
         )
+        self.future = None
 
         while not self.qp_client.wait_for_service(timeout_sec=1.0):
             self.node.get_logger().warn("Service not available, waiting again...")
 
     def request_path(self, start_state: State, end_state: State):
-        # Parse to dictionary
-        integrated_dict = {
-            **start_state.to_dict(start=True),
-            **end_state.to_dict(start=False),
-        }
+        if self.future is None or self.future.done():
+            print("Requesting Path...")
+            # Parse to dictionary
+            integrated_dict = {
+                **start_state.to_dict(start=True),
+                **end_state.to_dict(start=False),
+            }
 
-        # Send request
-        request = QuinticPolynomials.Request(**integrated_dict)
-        self.send_qp_request(request)
+            # Send request
+            request = QuinticPolynomials.Request(**integrated_dict)
+            self.send_qp_request(request)
+
+        else:
+            self.node.get_logger().warn("Previous request is not finished yet.")
 
     def send_qp_request(self, request: QuinticPolynomials.Request):
-        self.qp_client.call_async(request)
-        future: Future = self.qp_client.call_async(request)
-        future.add_done_callback(self.qp_response_callback)
+        self.future: Future = self.qp_client.call_async(request)
+        self.future.add_done_callback(self.qp_response_callback)
 
     def qp_response_callback(self, future: Future):
         response: QuinticPolynomials.Response = future.result()
+        self.path = response.path
 
-        path = response.path
-
-        self.node.get_logger().info("Publishing path...")
-
-        self.path = path
-
+    def publish_path(self):
         for _ in range(10):
-            self.path_publisher.publish(path)
+            self.path_publisher.publish(self.path)
 
 
 def main():

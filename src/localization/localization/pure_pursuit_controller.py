@@ -71,8 +71,8 @@ class DifferentialState:
         omega_right = v_right / wheel_radius
 
         # rad/s를 RPM으로 변환: RPM = (omega [rad/s] * 60) / (2*pi)
-        rpm_left = omega_left * (60 / (2 * math.pi))
-        rpm_right = omega_right * (60 / (2 * math.pi))
+        rpm_left = omega_left * (60 / (2 * np.pi))
+        rpm_right = omega_right * (60 / (2 * np.pi))
 
         return rpm_left, rpm_right
 
@@ -87,6 +87,14 @@ class TargetCourse:
         self.cx = cx
         self.cy = cy
         self.old_nearest_point_index = None
+
+    def search_current_index(self, state: DifferentialState):
+        dx = [state.x - icx for icx in self.cx]
+        dy = [state.y - icy for icy in self.cy]
+        d = np.hypot(dx, dy)
+        ind = np.argmin(d)
+
+        return ind
 
     def search_target_index(self, state: DifferentialState, Lfc=2.0, k=0.1):
         """
@@ -113,8 +121,10 @@ class TargetCourse:
                 distance_next_index = state.calc_distance(
                     self.cx[ind + 1], self.cy[ind + 1]
                 )
+
                 if distance_this_index < distance_next_index:
                     break
+
                 ind = ind + 1 if (ind + 1) < len(self.cx) else ind
                 distance_this_index = distance_next_index
             self.old_nearest_point_index = ind
@@ -145,7 +155,7 @@ def pure_pursuit_steer_control(
         tx = trajectory.cx[-1]
         ty = trajectory.cy[-1]
         ind = len(trajectory.cx) - 1
-        return 0.0, -1
+        return 0.0, len(trajectory.cx) - 1
 
     # 회전이 필요한 각도(α)
     alpha = math.atan2(ty - state.y, tx - state.x) - state.yaw

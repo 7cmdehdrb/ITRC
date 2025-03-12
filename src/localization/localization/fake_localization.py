@@ -75,31 +75,16 @@ class FakeLocalization(Node):
             model_description=self.model_description
         )
 
+        # Path Tracking Variables
         self.path = None
         self.target_course = None
         self.target_speed = 1.0
         self.target_ind = 0
-        self.last_time = self.get_clock().now()
+        self.last_currrent_ind = 0
+        self.Lfc = 1.0
 
-        # >>> STEP 2: Update Path <<<
-        euler_matrix = np.array([0.0, 0.0, np.deg2rad(90.0)])
-        quaternion_matrix = Transformation.euler_to_quaternion(*euler_matrix)
-        quaternion_key = ["x", "y", "z", "w"]
-
-        end_state = State(
-            position=Point(
-                x=float(np.random.randint(5, 10)),
-                y=float(np.random.randint(5, 10)),
-                z=0.0,
-            ),
-            orientation=Quaternion(**dict(zip(quaternion_key, quaternion_matrix))),
-            velocity=1.0,
-            acceleration=0.0,
-        )
-
-        self.update_path(end_state=end_state)
-
-        self.timer = self.create_timer(0.1, self.run)
+        self.hz = 15
+        self.timer = self.create_timer(float(1.0 / self.hz), self.run)
 
     def odom_callback(self, msg: Odometry):
         self.odom = msg
@@ -117,8 +102,6 @@ class FakeLocalization(Node):
         )
 
         self.qp_client.request_path(start_state=start_state, end_state=end_state)
-
-        self.get_logger().info("Path is ready!")
 
         return True
 
@@ -138,61 +121,121 @@ class FakeLocalization(Node):
 
         return TargetCourse(cx=cx, cy=cy)
 
+    def reset(self):
+        self.get_logger().info("Goal Reachedl. Resetting...")
+
+        self.path = None
+        self.target_course = None
+        self.target_speed = 1.0
+        self.target_ind = 0
+        self.last_currrent_ind = 0
+        self.Lfc = 1.0
+
+        self.qp_client.future = None
+
     def run(self):
-        # >>> STEP 3: Track the Path <<<
+        self.differential_state.update(self.odom)
+
+        # >>> STEP 2: Update Path <<<
         if self.path is None:
-            self.get_logger().warn("Path is None.")
+            # Initial Path Request
+            if self.qp_client.future is None:
+                self.differential_state.yaw
+                euler_matrix = np.array(
+                    [
+                        0.0,
+                        0.0,
+                        self.differential_state.yaw
+                        + np.deg2rad(np.random.randint(-90, 90)),
+                    ]
+                )
+                quaternion_matrix = Transformation.euler_to_quaternion(*euler_matrix)
+                quaternion_key = ["x", "y", "z", "w"]
 
-            if self.qp_client.path is not None:
-                self.get_logger().info("Path is updated.")
+                end_state = State(
+                    position=Point(
+                        x=self.differential_state.x + float(np.random.randint(5, 10)),
+                        y=self.differential_state.x - float(np.random.randint(5, 10)),
+                        z=0.0,
+                    ),
+                    orientation=Quaternion(
+                        **dict(zip(quaternion_key, quaternion_matrix))
+                    ),
+                    velocity=2.0,
+                    acceleration=0.0,
+                )
 
-                self.path = self.qp_client.path
+                self.update_path(end_state=end_state)
 
+                return True
+
+            # Check if the previous request is done
+            elif self.qp_client.future.done():
+                self.get_logger().info("Get response!")
+
+                self.qp_client.publish_path()
+
+                self.path = (
+                    self.qp_client.path if self.qp_client.path is not None else None
+                )
                 self.target_course = FakeLocalization.parse_path_to_target_course(
                     self.path
                 )
-
                 self.target_ind, _ = self.target_course.search_target_index(
-                    self.differential_state, Lfc=1.0, k=0.1
+                    self.differential_state, Lfc=self.Lfc, k=0.1
                 )
 
-            return None
+                return True
 
-        if self.target_course is None:
-            self.get_logger().warn("Target Course is None.")
-            return None
+            # Previous request is not finished yet
+            else:
+                self.get_logger().warn("Previous request is not finished yet.")
+                return False
 
-        # Update state
-        current_time = self.get_clock().now()
-        dt = (current_time - self.last_time).nanoseconds / 1e9
-        self.last_time = current_time
-
-        self.differential_state.update(self.odom)
+        # >>> STEP 3: Track the Path <<<
+        dt = float(1.0 / self.hz)
 
         # Calc control input
-        ai = proportional_control(
-            self.target_speed, self.differential_state.v, Kp=1.0
-        )  # acceleration
         alpha, self.target_ind = pure_pursuit_steer_control(
-            self.differential_state, self.target_course, self.target_ind, Lfc=1.0, k=0.1
-        )  # turning angle
+            self.differential_state,
+            self.target_course,
+            self.target_ind,
+            Lfc=self.Lfc,
+            k=0.1,
+        )
 
-        if self.target_ind == -1:
-            self.get_logger().info("Target reached!")
-            wheel_left = 0
-            wheel_right = 0
+        current_idx = self.target_course.search_current_index(self.differential_state)
 
-        else:
-            v = self.differential_state.v + ai * dt  # update velocity
+        print(
+            f"Current Index: {current_idx}, Last Cureent Index: {self.last_currrent_ind} Target Index: {self.target_ind}"
+        )
 
-            wheel_left, wheel_right = DifferentialState.differential_drive_rpm(
-                yaw_rate=alpha,
-                speed=v,
-                wheel_base=self.model_description["wheel_length"],
-                wheel_radius=self.model_description["wheel_radius"],
-            )
+        if current_idx < self.last_currrent_ind:
+            self.get_logger().warn("Path tracking is not working properly.")
+            self.reset()
+            return True
+
+        self.last_currrent_ind = current_idx
+
+        if self.target_ind == len(self.target_course.cx) - 1:
+
+            if len(self.target_course.cx) - 1 - current_idx < 3:
+                self.get_logger().info("Goal Reached!")
+                self.reset()
+                return True
+
+        ai = proportional_control(self.target_speed, self.differential_state.v, Kp=1.0)
+
+        v = self.differential_state.v + ai * dt  # update velocity
 
         # >>> STEP 4: Publish Control Input <<<
+        wheel_left, wheel_right = DifferentialState.differential_drive_rpm(
+            yaw_rate=alpha,
+            speed=v,
+            wheel_base=self.model_description["wheel_length"],
+            wheel_radius=self.model_description["wheel_radius"],
+        )
+
         feedback = SerialFeedback()
         feedback.interval_time = dt
         feedback.motor_left_rpm = int(wheel_left)
