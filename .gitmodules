@@ -1,15 +1,15 @@
 [submodule "src/moveit2"]
 	path = src/moveit2
-	url = https://github.com/moveit/moveit2.git
-	branch = humble
+	url = https://github.com/7cmdehdrb/moveit2.git
+	branch = branch_7cmdehdrb
 [submodule "src/moveit_msgs"]
 	path = src/moveit_msgs
 	url = https://github.com/moveit/moveit_msgs.git
 	branch = humble
 [submodule "src/moveit_resources"]
 	path = src/moveit_resources
-	url = https://github.com/moveit/moveit_resources.git
-	branch = humble
+	url = https://github.com/7cmdehdrb/moveit_resources.git
+	branch = branch_7cmdehdrb
 [submodule "src/web_video_server"]
 	path = src/web_video_server
 	url = https://github.com/RobotWebTools/web_video_server.git
