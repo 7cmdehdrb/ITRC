@@ -10,9 +10,6 @@
 	path = src/moveit_resources
 	url = https://github.com/moveit/moveit_resources.git
 	branch = humble
-[submodule "src/urdf_files_dataset"]
-	path = src/urdf_files_dataset
-	url = https://github.com/Daniella1/urdf_files_dataset.git
 [submodule "src/web_video_server"]
 	path = src/web_video_server
 	url = https://github.com/RobotWebTools/web_video_server.git
